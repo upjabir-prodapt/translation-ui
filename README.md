@@ -4,13 +4,47 @@ The front end of the Translation use case on the Colt AI Hub: a React SPA served
 as static files by nginx from its own Cloud Run service, `translation-ui`, in
 `gclt-aicoe-dev-st` (`europe-west3`).
 
-It was split out of `code-scanning-toolset/shared-aihub-ui`,
-where the same pages ran inside the hub. The use-case code under
-`src/usecases/translation/` and `src/usecases/base.ts` is copied unchanged from the
-hub's `frontend/src/usecases/`; the shell, sign-in, API client, job tracker and
-UI primitives come from the shared package `@aicoe/aihub-platform`.
+It was split out of `code-scanning-toolset/shared-aihub-ui`, where the same
+pages ran inside the hub. This repository is now the only source of the
+Translation UI. The shell, sign-in, API client, job tracker and UI primitives
+come from the shared package `@aicoe/aihub-platform`.
 
 GitLab: `code-scanning-toolset/shared-translation-ui`. Branches `sandbox` → `dev` → `prod`.
+
+## Layout
+
+```
+src/
+  main.tsx                  bootstrap: platform CSS and i18n, quota services, render
+  app/
+    App.tsx                 router, platform providers, TranslationJobsProvider
+    routes.tsx              routes, role gate, /denied forwarding, leaving the app
+    config.ts               slug, label, roles, sidebar, platform descriptor
+    leaveApp.ts             full-page navigation out of the app
+  pages/
+    TranslationPage.tsx     /translation: upload or paste, run, recent runs
+    TrackerPage.tsx         /translation/tracker: the platform job tracker
+  components/
+    ReviewModal.tsx         feedback dialog for a completed job
+  features/jobs/            job state: polling hook, provider, context, JobSource
+  api/
+    client.ts               /api/translation/* calls through the platform client
+    types.ts                request and response shapes
+  styles/translation.css
+  test/setup.ts
+```
+
+Tests sit next to the module they test (`*.test.ts[x]`).
+
+`src/app/config.ts` is the one place the slug, roles and sidebar are declared.
+The platform reads the app through `UseCasesContext` (its role check uses the
+slug and roles, `AccessDenied` the label), so `config.ts` also exports that
+descriptor. The slug appears twice more, in `vite.config.ts` (`base`) and the
+Dockerfile's `SLUG` (nginx), and the three must agree.
+
+`TranslationJobsProvider` is mounted in `App.tsx` above the routes on purpose: a
+running job keeps polling while the user moves between `/translation` and
+`/translation/tracker`.
 
 ## How requests reach this app
 
@@ -36,16 +70,15 @@ browser ──► https://aihub.aicoedev-int.colt.net/...
   breadcrumb root and "Feedback & support" are full-page links: the hub is a
   different service behind the same load balancer. A client-side navigation to
   a path outside `/translation` (e.g. a "back" button calling `navigate('/')`) is
-  turned into a full-page load too (`src/AppRoutes.tsx`).
+  turned into a full-page load too (`src/app/routes.tsx`).
 
 ### No router basename
 
-`src/AppRoutes.tsx` mounts the manifest exactly as the hub's `router.tsx` does,
-with **no** `basename`. The manifest's routes (`translation/...`), its sidebar
-entries and the vertical's own links are written as paths on the shared host,
-because that is what they are in the hub; a basename of `/translation` would prefix
-each of them a second time. Since only `/translation/*` ever reaches this app, host
-paths and router paths are the same thing.
+`src/app/routes.tsx` mounts the routes with **no** `basename`. The routes
+(`translation`, `translation/tracker`), the sidebar entries and the pages' own
+links are written as paths on the shared host; a basename of `/translation`
+would prefix each of them a second time. Since only `/translation/*` ever
+reaches this app, host paths and router paths are the same thing.
 
 The one platform path outside the app is `/denied`: `RequireRole` redirects a
 user without the role there. This app forwards it to `/translation/denied`, so the

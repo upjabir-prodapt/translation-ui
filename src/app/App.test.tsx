@@ -5,10 +5,9 @@ import App from './App';
 
 /**
  * The whole app as main.tsx mounts it, at the path the load balancer forwards
- * here, with only the BFF faked. Proves the composition (router, registry,
- * platform providers, the vertical's own provider, shell, role gate, lazy
- * route) hangs together; the routing rules themselves are pinned in
- * AppRoutes.test.tsx.
+ * here, with only the BFF faked. Proves the composition (router, descriptor,
+ * platform providers, the job provider, shell, role gate, lazy page) hangs
+ * together; the routing rules themselves are pinned in routes.test.tsx.
  */
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
@@ -56,7 +55,7 @@ const LAZY_ROUTE = { timeout: 10_000 };
 const TEST_TIMEOUT = 20_000;
 
 describe('App', () => {
-  it('signs in through the BFF session and renders the vertical under /translation', async () => {
+  it('signs in through the BFF session and renders the app under /translation', async () => {
     window.history.pushState({}, '', '/translation');
     const fetchMock = stubBff(['Translation.User']);
 

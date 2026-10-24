@@ -1,5 +1,5 @@
 import React from 'react';
-import { translationApi } from './api';
+import { translationApi } from '../api/client';
 import { FeedbackDialog, type FeedbackExample } from '@aicoe/aihub-platform/ui';
 
 interface ReviewModalProps {

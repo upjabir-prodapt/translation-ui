@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { useCase } from './useCase';
+import { APP_DESCRIPTOR, APP_ROLES, APP_SLUG } from './config';
 
 /**
  * The entitlement list must equal the roles Apigee's gate accepts for
@@ -9,10 +9,12 @@ import { useCase } from './useCase';
  */
 describe('translation roles match the Apigee gate', () => {
   it('is entitled to exactly Translation.User and Platform.Admin', () => {
-    expect([...useCase.roles].sort()).toEqual(['Translation.User', 'Platform.Admin'].sort());
+    expect([...APP_ROLES].sort()).toEqual(['Translation.User', 'Platform.Admin'].sort());
   });
 
-  it('adds no route-level role gate', () => {
-    expect(useCase.routes.filter((route) => route.roles)).toEqual([]);
+  it('gives the platform the same slug and roles the routes are gated on', () => {
+    expect(APP_DESCRIPTOR.slug).toBe(APP_SLUG);
+    expect(APP_DESCRIPTOR.roles).toBe(APP_ROLES);
+    expect(APP_DESCRIPTOR.hub?.name).toBe('Translation');
   });
 });

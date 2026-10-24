@@ -1,11 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { translationApi } from './api';
+import { translationApi } from '../../api/client';
 import type {
   JobStatusResponse,
   DownloadUrlResponse,
   MultiTranslateResponse,
   MultiJobStatusItem,
-} from './types';
+} from '../../api/types';
 
 export type TranslationStatus =
   | 'idle'

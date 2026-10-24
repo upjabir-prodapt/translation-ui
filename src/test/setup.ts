@@ -6,7 +6,7 @@ import { cleanup } from '@testing-library/react';
  * Node 25+ ships its own `localStorage` / `sessionStorage` globals, which are
  * `undefined` unless node runs with --localstorage-file, and they shadow
  * jsdom's in Vitest. Point them back at jsdom's so code that reads storage at
- * render time (the shell's sidebar state, a vertical's saved preferences)
+ * render time (the shell's sidebar state, the app's saved translation batch)
  * behaves as it does in a browser.
  * A no-op on Node 24, where those globals do not exist.
  */

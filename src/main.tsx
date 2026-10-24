@@ -5,19 +5,16 @@ import { createRoot } from 'react-dom/client';
 import '@aicoe/aihub-platform/styles.css';
 // Importing the module initialises the shared i18n instance (platform strings,
 // language detection) before anything renders.
-import { addUseCaseResources } from '@aicoe/aihub-platform/i18n';
+import '@aicoe/aihub-platform/i18n';
 import { setQuotaServices } from '@aicoe/aihub-platform/api';
 import { ErrorBoundary } from '@aicoe/aihub-platform/ui';
-import App from './App';
-import { useCase } from './useCase';
-
-// This vertical's own translations, merged into the shared bundle.
-if (useCase.i18n) addUseCaseResources(useCase.i18n);
+import App from './app/App';
+import { APP_SLUG } from './app/config';
 
 // Platform knows no slugs: tell the API client which `/api/<slug>/` responses
 // carry quota headers. Before the first render, so it is in place before the
 // first request goes out.
-setQuotaServices([useCase.slug]);
+setQuotaServices([APP_SLUG]);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

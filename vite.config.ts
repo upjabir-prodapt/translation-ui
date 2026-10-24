@@ -12,6 +12,7 @@ import react from '@vitejs/plugin-react';
  * forwards `/auth`, `/api` and `/platform` to a local BFF on :8080 — the same
  * one the hub uses, run as described in README.md.
  */
+/** Must match `APP_SLUG` in src/app/config.ts. */
 const SLUG = 'translation';
 
 const BFF_TARGET = process.env.BFF_ORIGIN ?? 'http://localhost:8080';

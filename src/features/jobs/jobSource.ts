@@ -8,10 +8,10 @@ import {
   fractionToPercent,
   shortRunLabel,
 } from '@aicoe/aihub-platform/jobs';
-import type { JobStatusResponse, LegacyJobStatusResponse } from './types';
-import { translationApi } from './api';
+import type { JobStatusResponse, LegacyJobStatusResponse } from '../../api/types';
+import { translationApi } from '../../api/client';
 import { useTranslationJobs } from './useTranslationJobs';
-import ReviewModal from './ReviewModal';
+import ReviewModal from '../../components/ReviewModal';
 
 /**
  * Builds the lazily-fetched detail fields from a translation job's full

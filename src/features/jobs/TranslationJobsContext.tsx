@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useTranslation as useTranslationJobsHook } from './useTranslation';
-import { translationApi } from './api';
+import { translationApi } from '../../api/client';
 import { TranslationJobsContext } from './translationJobsContextValue';
 
 /**

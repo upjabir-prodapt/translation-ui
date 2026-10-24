@@ -3,20 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const submitReview = vi.fn();
 
-vi.mock('./usecases/translation/api', () => ({
+vi.mock('../api/client', () => ({
   translationApi: { submitReview: (...a: unknown[]) => submitReview(...a) },
 }));
 
-import ReviewModal from './usecases/translation/ReviewModal';
+import ReviewModal from './ReviewModal';
 
 /**
- * The Translation half of the hub's feedback-dialog parity test
- * (aihub-ui frontend/src/app/feedbackParity.test.tsx). The Sales half lives in
- * sales-ui; both pin the same numbers, so the two dialogs cannot drift apart
- * again now that they live in separate repositories.
- *
- * Kept outside src/usecases/ so that folder stays a byte-for-byte copy of the
- * hub's.
+ * The Translation half of the feedback-dialog parity test. The Sales half
+ * lives in sales-ui; both pin the same numbers, so the two dialogs cannot
+ * drift apart now that they live in separate repositories.
  */
 
 describe('Translation feedback dialog', () => {

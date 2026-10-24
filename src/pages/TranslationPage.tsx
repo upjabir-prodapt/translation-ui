@@ -1,13 +1,13 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
-import { useTranslationJobs } from './useTranslationJobs';
+import { useTranslationJobs } from '../features/jobs/useTranslationJobs';
 import { useServiceJobs } from '@aicoe/aihub-platform/jobs';
-import { translationJobSource } from './jobSource';
-import ReviewModal from './ReviewModal';
+import { translationJobSource } from '../features/jobs/jobSource';
+import ReviewModal from '../components/ReviewModal';
 import { SubmitErrorModal, FeedbackToast, RunJobModal } from '@aicoe/aihub-platform/ui';
 import { RecentRuns } from '@aicoe/aihub-platform/tracker';
 import { ServiceLanding } from '@aicoe/aihub-platform/hub';
-import './translation.css';
+import '../styles/translation.css';
 
 // ΓöÇΓöÇΓöÇ Constants ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 const LANGUAGES = [
