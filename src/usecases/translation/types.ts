@@ -1,0 +1,169 @@
+// ── Submit Translation Job ─────────────────────────────────────────────────
+export interface TranslateRequest {
+  file: File;
+  target_languages: string[]; // 1–5 target language codes (e.g. ["de", "fr"])
+  source_language?: string;   // Optional – auto-detected if omitted
+  domain: string;             // "commercial" | "legal" | "finance" | "hr" | "operations"
+  enable_dlp?: boolean;
+  enable_chunking?: boolean;
+  priority?: string;          // "standard" | "high" (server-controlled; auto-promoted for .txt)
+}
+
+// Hub browser path: /api/translation/v1/* → Apigee `int` proxy (no path
+// rewrite) → Translation backend, whose own API_PREFIX is also
+// /api/translation/v1 (see the shared-dev implementation plan, decision D6).
+// A previous version of this comment said Apigee rewrote the path to the
+// backend's /api/v1/*; that was never true — the backend's prefix was
+// changed to match Apigee's incoming path instead, so paths are identical
+// end to end. Do not "fix" this back to a rewrite assumption.
+//
+// POST /api/translation/v1/translate → 202
+export interface MultiTranslateJobResponse {
+  job_id: string;
+  target_language: string;
+  status: string;
+  status_url: string;
+  /** True when job_id is an existing job reused for a duplicate submission
+   *  (implementation_plan.md D.5 / EC-15 idempotency window). */
+  is_duplicate?: boolean;
+}
+
+export interface MultiTranslateResponse {
+  batch_id: string;
+  jobs: MultiTranslateJobResponse[];
+}
+
+// POST /api/translation/v1/jobs/status → 200
+export interface MultiJobStatusRequest {
+  job_ids: string[];
+}
+
+export interface MultiJobStatusItem {
+  job_id: string;
+  target_language: string;
+  /**
+   * `human_review_required` is terminal on the backend
+   * (Translation `src/shared/job_status.py` lists it in TERMINAL_STATUSES)
+   * but is NOT downloadable: the download route rejects anything other
+   * than `completed` with a 400.
+   */
+  status:
+    | 'queued'
+    | 'processing'
+    | 'completed'
+    | 'human_review_required'
+    | 'failed'
+    | 'cancelled';
+  download_url?: string | null;
+  download_filename?: string | null;
+  error_message?: string | null;
+}
+
+export interface MultiJobStatusResponse {
+  jobs: MultiJobStatusItem[];
+}
+
+// ── Job result payload ─────────────────────────────────────────────────────
+export interface TranslationResult {
+  translated_document?: {
+    content: string | null;
+    format: string;
+    filename: string;
+    download_url: string;
+  };
+  metadata: {
+    source_language: string;
+    target_language: string;
+    domain: string;
+    model_used: string;
+    model_version: string;
+    quality_score?: number | null;
+    ab_test_variant: string;
+    chunks_processed: number;
+    retry_attempts: number;
+  };
+  labels: {
+    translation_intent: string;
+    processing_time_seconds: number;
+    token_count: number;
+    cost_usd: number;
+  };
+}
+
+// GET /api/v1/translate/{job_id} → 200
+export interface JobStatusResponse {
+  job_id: string;
+  /**
+   * `human_review_required` is terminal on the backend
+   * (Translation `src/shared/job_status.py` lists it in TERMINAL_STATUSES)
+   * but is NOT downloadable: the download route rejects anything other
+   * than `completed` with a 400.
+   */
+  status:
+    | 'queued'
+    | 'processing'
+    | 'completed'
+    | 'human_review_required'
+    | 'failed'
+    | 'cancelled';
+  submitted_at: string;
+  completed_at?: string | null;
+  result?: TranslationResult | null;
+  error_message?: string | null;
+}
+
+// GET /api/v1/jobs/{job_id} → 200  (legacy/alternative endpoint)
+// Also used for items from the GET /jobs history list.
+export interface LegacyJobStatusResponse {
+  job_id: string;
+  status: string;
+  /** 0.0–1.0 fraction, as emitted by JobStatusResponse.progress on the backend. */
+  progress: number;
+  current_stage: string;
+  user: string;
+  department: string;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+  download_url: string | null;
+  error_message: string | null;
+  // Confirmed fields returned by GET /jobs (JobStatusResponse), sourced from
+  // the job's source_document / translation_config records.
+  filename?: string | null;
+  source_language?: string | null;
+  target_language?: string | null;
+}
+
+// GET /api/v1/jobs/{job_id}/download → 200
+export interface DownloadUrlResponse {
+  download_url: string;
+  expires_in: number;
+  filename: string;
+  file_size: number;
+}
+
+// Standard error shape from the API
+export interface ApiError {
+  error: {
+    message: string;
+    code: string;
+    details?: Record<string, unknown>;
+  };
+}
+
+// POST /api/v1/reviews/{job_id} → 201
+export interface ReviewRequest {
+  rating: number;   // 1–5
+  comment?: string; // max 2000 chars
+}
+
+/**
+ * What `POST /reviews/{job_id}` actually returns (201) — the service's
+ * ReviewSubmitResponse, an acknowledgement rather than the stored review.
+ * The full record is only available from `GET /reviews/{job_id}`, which no UI
+ * surface uses yet.
+ */
+export interface ReviewSubmitResponse {
+  status: string;
+  review_id: string;
+}
