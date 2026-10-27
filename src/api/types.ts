@@ -150,20 +150,3 @@ export interface ApiError {
     details?: Record<string, unknown>;
   };
 }
-
-// POST /api/v1/reviews/{job_id} → 201
-export interface ReviewRequest {
-  rating: number;   // 1–5
-  comment?: string; // max 2000 chars
-}
-
-/**
- * What `POST /reviews/{job_id}` actually returns (201) — the service's
- * ReviewSubmitResponse, an acknowledgement rather than the stored review.
- * The full record is only available from `GET /reviews/{job_id}`, which no UI
- * surface uses yet.
- */
-export interface ReviewSubmitResponse {
-  status: string;
-  review_id: string;
-}

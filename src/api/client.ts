@@ -4,8 +4,6 @@ import type {
   MultiJobStatusResponse,
   JobStatusResponse,
   DownloadUrlResponse,
-  ReviewRequest,
-  ReviewSubmitResponse,
   LegacyJobStatusResponse,
 } from './types';
 import { apiFetch, apiJson, apiPostJson } from '@aicoe/aihub-platform/api';
@@ -84,12 +82,6 @@ export const translationApi = {
       { reason: reason ?? 'Cancelled by user' },
       { method: 'DELETE', errorMessage: 'Failed to cancel job' },
     );
-  },
-
-  async submitReview(jobId: string, review: ReviewRequest): Promise<ReviewSubmitResponse> {
-    return await apiPostJson<ReviewSubmitResponse>(`${API_BASE}/reviews/${jobId}`, review, {
-      errorMessage: 'Failed to submit review',
-    });
   },
 
   /**

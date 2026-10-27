@@ -3,8 +3,12 @@ import { useDropzone, type FileRejection } from 'react-dropzone';
 import { useTranslationJobs } from '../features/jobs/useTranslationJobs';
 import { useServiceJobs } from '@aicoe/aihub-platform/jobs';
 import { translationJobSource } from '../features/jobs/jobSource';
-import ReviewModal from '../components/ReviewModal';
-import { SubmitErrorModal, FeedbackToast, RunJobModal } from '@aicoe/aihub-platform/ui';
+import {
+  SubmitErrorModal,
+  FeedbackToast,
+  RunJobModal,
+  openRunFeedback,
+} from '@aicoe/aihub-platform/ui';
 import { RecentRuns } from '@aicoe/aihub-platform/tracker';
 import { ServiceLanding } from '@aicoe/aihub-platform/hub';
 import '../styles/translation.css';
@@ -113,7 +117,6 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
   const serviceJobs = useServiceJobs(translationJobSource);
   const [runOpen, setRunOpen] = useState(false);
 
-  const [reviewJobId, setReviewJobId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [targetDropdownOpen, setTargetDropdownOpen] = useState(false);
@@ -273,11 +276,6 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
         resultRef.current.scrollIntoView({ behavior: 'smooth' });
       }
     }, 500);
-  };
-
-  // ── Review toast ──
-  const handleReviewSubmitted = (ok: boolean, message: string) => {
-    showToast(ok, message);
   };
 
   const wordCount = countWords(sourceText);
@@ -674,19 +672,11 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
           onCancel={serviceJobs.cancelJob}
           onDownload={serviceJobs.downloadJob}
           onLoadDetail={serviceJobs.loadDetail}
-          onFeedback={(job) => setReviewJobId(job.id)}
+          // Feedback on a run is an AI Hub ticket, pre-filled with the run.
+          onFeedback={openRunFeedback}
           onOpenTracker={onOpenTracker}
         />
       </div>
-
-      {reviewJobId && (
-        <ReviewModal
-          isOpen={!!reviewJobId}
-          jobId={reviewJobId}
-          onClose={() => setReviewJobId(null)}
-          onSubmitted={handleReviewSubmitted}
-        />
-      )}
 
       <FeedbackToast toast={toast} onDismiss={() => setToast(null)} />
     </div>
