@@ -10,8 +10,8 @@ import {
 } from '@aicoe/aihub-platform/jobs';
 import type { JobStatusResponse, LegacyJobStatusResponse } from '../../api/types';
 import { translationApi } from '../../api/client';
+import { openRunFeedback } from '@aicoe/aihub-platform/ui';
 import { useTranslationJobs } from './useTranslationJobs';
-import ReviewModal from '../../components/ReviewModal';
 
 /**
  * Builds the lazily-fetched detail fields from a translation job's full
@@ -149,7 +149,8 @@ export const translationJobSource: JobSource = {
       [ctx],
     );
   },
-  ReviewModal,
+  // Feedback on a finished run goes to the AI Hub's ticket form.
+  openFeedback: openRunFeedback,
   label: 'Translation',
   fetchDetail: async (job) => extractTranslationDetail(await translationApi.getJobStatus(job.id)),
 };
