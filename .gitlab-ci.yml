@@ -209,6 +209,28 @@ variables:
       export AIHUB_NPMRC
       echo "OK - npm auth for ${REGISTRY} (job-local)"
 
+# Per-environment registry (prod reads its own aihub-npm). When the
+# prod-scoped AIHUB_NPM_REGISTRY is set, the committed dev registry URL in
+# .npmrc and package-lock.json is rewritten in THIS job's checkout only, before
+# .require_lockfile checks them and the image build runs `npm ci`. Integrity
+# hashes are untouched, so the target registry must hold the byte-identical
+# tarball (prod: copied from dev's aihub-npm). Unset (dev): no change.
+".aihub_registry_override":
+  before_script:
+    - |
+      set -e
+      if [ -n "${AIHUB_NPM_REGISTRY:-}" ]; then
+        case "$AIHUB_NPM_REGISTRY" in
+          https://*-npm.pkg.dev/*/) ;;
+          *) echo "ERROR - AIHUB_NPM_REGISTRY must be an aihub-npm Artifact Registry URL ending in / (got '${AIHUB_NPM_REGISTRY}')."; exit 1 ;;
+        esac
+        COMMITTED="$(sed -n 's/^@aicoe:registry=//p' .npmrc | tr -d '[:space:]')"
+        if [ "$COMMITTED" != "$AIHUB_NPM_REGISTRY" ]; then
+          sed -i "s#${COMMITTED}#${AIHUB_NPM_REGISTRY}#g" .npmrc package-lock.json
+          echo "OK - @aicoe registry overridden for this job: ${COMMITTED} -> ${AIHUB_NPM_REGISTRY}"
+        fi
+      fi
+
 # CI installs exactly what package-lock.json pins, or not at all. A lockfile
 # resolved against a local tarball (file:) or a linked local checkout
 # ("link": true, a relative "resolved") would install something other than the
@@ -335,6 +357,7 @@ frontend-checks:
   before_script:
     - !reference [".gcp_wif", before_script]
     - !reference [".ensure_node", before_script]
+    - !reference [".aihub_registry_override", before_script]
     - !reference [".require_lockfile", before_script]
     - !reference [".npm_registry_auth", before_script]
   script:
@@ -368,6 +391,7 @@ build-and-push:
   when: manual
   before_script:
     - !reference [".gcp_wif", before_script]
+    - !reference [".aihub_registry_override", before_script]
     - !reference [".require_lockfile", before_script]
     - !reference [".npm_registry_auth", before_script]
   script:
