@@ -17,9 +17,12 @@ import '../styles/translation.css';
 const LANGUAGES = [
   { code: 'en', label: 'English', flag: 'EN' },
   { code: 'de', label: 'German', flag: '🇩🇪' },
+  { code: 'de-CH', label: 'Swiss German', flag: '🇨🇭' },
+  { code: 'nl', label: 'Dutch', flag: '🇳🇱' },
   { code: 'it', label: 'Italian', flag: '🇮🇹' },
   { code: 'fr', label: 'French', flag: '🇫🇷' },
   { code: 'es', label: 'Spanish', flag: '🇪🇸' },
+  { code: 'pt', label: 'Portuguese', flag: '🇵🇹' },
   { code: 'ja', label: 'Japanese', flag: '🇯🇵' },
 ];
 
