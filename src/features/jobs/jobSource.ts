@@ -216,5 +216,7 @@ export const translationJobSource: JobSource = {
   // Feedback on a finished run goes to the AI Hub's ticket form.
   openFeedback: openRunFeedback,
   label: 'Translation',
+  // Backend keeps runs and outputs for JOB_RETENTION_DAYS (183); shown in the Job Tracker.
+  historyWindow: '6 months',
   fetchDetail: async (job) => extractTranslationDetail(await translationApi.getJobStatus(job.id)),
 };
