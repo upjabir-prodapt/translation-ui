@@ -406,6 +406,10 @@ frontend-checks:
 
 build-and-push:
   stage: build
+  # after_script defaults to 5 min; the docker cleanup below can take longer
+  # when the runner has a backlog of build cache.
+  variables:
+    RUNNER_AFTER_SCRIPT_TIMEOUT: 10m
   extends:
     - ".gcp_wif"
     - ".shell_runner"
@@ -462,9 +466,9 @@ build-and-push:
     # them, dangling layers, and build cache unused for 24 h.
     - |
       IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
-      docker image rm -f "$IMAGE_URI" >/dev/null 2>&1 || true
-      docker image prune -f >/dev/null 2>&1 || true
-      docker builder prune -f --filter until=24h >/dev/null 2>&1 || true
+      timeout 120 docker image rm -f "$IMAGE_URI" >/dev/null 2>&1 || true
+      timeout 120 docker image prune -f >/dev/null 2>&1 || true
+      timeout 300 docker builder prune -f --filter until=24h >/dev/null 2>&1 || true
     - !reference [".runner_after", after_script]
   rules:
     - if: $CI_COMMIT_BRANCH == "sandbox"
