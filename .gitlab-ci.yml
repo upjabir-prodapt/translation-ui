@@ -56,6 +56,31 @@ variables:
 ".shell_runner":
   tags:
     - Shell1
+  hooks:
+    pre_get_sources_script:
+      - |
+        echo "Disk space on $(hostname -s 2>/dev/null || hostname) before ${CI_JOB_NAME}:"
+        DOCKER_ROOT="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)"
+        df -h "${CI_BUILDS_DIR:-/}" "${HOME}" ${DOCKER_ROOT:+"$DOCKER_ROOT"} 2>/dev/null || true
+  after_script:
+    - !reference [".runner_after", after_script]
+
+# End of every shell-runner job, pass or fail. Deletes what the job leaves
+# behind that nothing reuses: WIF credentials, the per-job gcloud and docker
+# config, CI_WORK_TMP (job-local npmrc/token files) and tool scratch dirs.
+# Paths listed under any job's `cache:` or `artifacts:` are deliberately NOT
+# touched: GitLab uploads those after after_script runs. Then reports free
+# space. Referenced by both .shell_runner and .gcp_wif, so whichever template a
+# job lists last the cleanup still runs; jobs with their own after_script
+# reference it last. Space at job start is printed by the pre_get_sources hook
+# above, which runs before the checkout.
+".runner_after":
+  after_script:
+    - rm -rf "${CI_PROJECT_DIR}/.cache/gcloud-config" "${CI_PROJECT_DIR}/.cache/docker" "${CI_WORK_TMP:-${CI_PROJECT_DIR}/.ci-work}" "${CI_PROJECT_DIR}/.cache/xdg" "${CI_PROJECT_DIR}/.cache/virtualenv-app-data" "${CI_PROJECT_DIR}/workload_identity.jwt" "${CI_PROJECT_DIR}/credentials.json" 2>/dev/null || true
+    - |
+      echo "Disk space on $(hostname -s 2>/dev/null || hostname) after ${CI_JOB_NAME}:"
+      DOCKER_ROOT="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)"
+      df -h "${CI_PROJECT_DIR}" "${HOME}" ${DOCKER_ROOT:+"$DOCKER_ROOT"} 2>/dev/null || true
 
 ".proxy":
   before_script:
@@ -170,7 +195,7 @@ variables:
       - .tools/google-cloud-sdk/
     policy: pull-push
   after_script:
-    - rm -rf "${CI_PROJECT_DIR}/.cache/gcloud-config" "${CI_PROJECT_DIR}/.cache/docker" workload_identity.jwt credentials.json 2>/dev/null || true
+    - !reference [".runner_after", after_script]
 
 # Read access to @aicoe/aihub-platform in the aihub-npm Artifact Registry
 # (gclt-aicoe-dev-aihub-ui), where shared-aihub-ui's publish-platform-package
@@ -373,7 +398,7 @@ frontend-checks:
       npm run test
   after_script:
     - rm -f "${CI_WORK_TMP:-${CI_PROJECT_DIR}/.ci-work}/aihub-npm.npmrc" 2>/dev/null || true
-    - rm -rf "${CI_PROJECT_DIR}/.cache/gcloud-config" workload_identity.jwt credentials.json 2>/dev/null || true
+    - !reference [".runner_after", after_script]
   rules:
     - if: $CI_COMMIT_BRANCH == "sandbox"
     - if: $CI_COMMIT_BRANCH == "dev"
@@ -432,7 +457,15 @@ build-and-push:
       docker push "$IMAGE_URI"
   after_script:
     - rm -f "${CI_WORK_TMP:-${CI_PROJECT_DIR}/.ci-work}/aihub-npm.npmrc" 2>/dev/null || true
-    - rm -rf "${CI_PROJECT_DIR}/.cache/gcloud-config" "${CI_PROJECT_DIR}/.cache/docker" workload_identity.jwt credentials.json 2>/dev/null || true
+    # The images are in Artifact Registry once pushed; the local copies are
+    # never reused and otherwise pile up on the shared runner's disk. Remove
+    # them, dangling layers, and build cache unused for 24 h.
+    - |
+      IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
+      docker image rm -f "$IMAGE_URI" >/dev/null 2>&1 || true
+      docker image prune -f >/dev/null 2>&1 || true
+      docker builder prune -f --filter until=24h >/dev/null 2>&1 || true
+    - !reference [".runner_after", after_script]
   rules:
     - if: $CI_COMMIT_BRANCH == "sandbox"
     - if: $CI_COMMIT_BRANCH == "dev"
