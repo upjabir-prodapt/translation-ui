@@ -3,6 +3,7 @@ import type {
   MultiJobStatusRequest,
   MultiJobStatusResponse,
   JobStatusResponse,
+  JobListResponse,
   LegacyJobStatusResponse,
 } from './types';
 import { apiFetch, apiJson, apiPostJson } from '@aicoe/aihub-platform/api';
@@ -42,22 +43,34 @@ export const translationApi = {
   },
 
   /**
-   * `GET /jobs` — this user's job history for the Job Tracker. Accepts either a
-   * bare array or a `{ jobs: [...] }` envelope; the live service's exact shape
-   * was never confirmed, and the mock upstream emits the envelope.
+   * `GET /jobs` — one page of this user's job history (the retention period,
+   * newest first) for the Job Tracker. Pass a page's `nextCursor` back as
+   * `cursor` for the next, older page; `nextCursor` is null on the last one.
+   * Accepts either a bare array or a `{ jobs: [...] }` envelope; the mock
+   * upstream emits the envelope.
    */
-  async listJobs(): Promise<LegacyJobStatusResponse[]> {
-    const data = await apiJson<{ jobs?: LegacyJobStatusResponse[] } | LegacyJobStatusResponse[]>(
-      // `limit` is explicit because the service defaults it to 10, which
-      // silently truncated the Job Tracker's history. 100 is the server max.
-      // No `status` filter: the backend's filter regex rejects
-      // `human_review_required`, so filtering happens client-side.
-      `${API_BASE}/jobs?limit=100`,
+  async listJobsPage(
+    cursor?: string | null,
+  ): Promise<{ jobs: LegacyJobStatusResponse[]; nextCursor: string | null }> {
+    // `limit` is explicit because the service defaults it to 10, which
+    // silently truncated the Job Tracker's history. 100 is the server max.
+    // No `status` filter: the backend's filter regex rejects
+    // `human_review_required`, so filtering happens client-side.
+    const query = cursor ? `limit=100&cursor=${encodeURIComponent(cursor)}` : 'limit=100';
+    const data = await apiJson<JobListResponse | LegacyJobStatusResponse[]>(
+      `${API_BASE}/jobs?${query}`,
       { errorMessage: 'Failed to fetch job history' },
     );
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.jobs)) return data.jobs;
-    return [];
+    if (Array.isArray(data)) return { jobs: data, nextCursor: null };
+    return {
+      jobs: Array.isArray(data?.jobs) ? data.jobs : [],
+      nextCursor: data?.next_cursor || null,
+    };
+  },
+
+  /** The newest page of `GET /jobs` only. */
+  async listJobs(): Promise<LegacyJobStatusResponse[]> {
+    return (await translationApi.listJobsPage()).jobs;
   },
 
   async cancelJob(jobId: string, reason?: string): Promise<{ message: string }> {
