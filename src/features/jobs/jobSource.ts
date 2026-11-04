@@ -11,6 +11,7 @@ import {
 import type { JobStatusResponse, LegacyJobStatusResponse } from '../../api/types';
 import { translationApi } from '../../api/client';
 import { openRunFeedback } from '@aicoe/aihub-platform/ui';
+import { apiDownload } from '@aicoe/aihub-platform/api';
 import { useTranslationJobs } from './useTranslationJobs';
 
 /**
@@ -121,6 +122,30 @@ export function normalizeTranslationActiveItem(item: JobStatusResponse): Unified
 }
 
 
+/** The translated file's extension, taken from the row title when it has one. */
+function extensionOf(name: string): string {
+  const match = /\.[A-Za-z0-9]{1,8}$/.exec(name.trim());
+  return match ? match[0].toLowerCase() : '';
+}
+
+/**
+ * Downloads a finished job's translated file through the BFF:
+ * `GET /api/translation/v1/jobs/{id}/output` streams it with
+ * `Content-Disposition: attachment`, and `apiDownload` saves it from a blob
+ * with the session cookie. Never `window.open` on a signed GCS URL: that
+ * rendered PDFs/TXT inline and handed out a link that bypassed auth.
+ *
+ * The fallback name mirrors the server's `{job_id}_mono{ext}` and is used only
+ * if the response carries no filename. The jobs' own `download_url` fields are
+ * deliberately not read.
+ */
+export function downloadTranslationOutput(job: Pick<UnifiedJob, 'id' | 'title'>): Promise<void> {
+  return apiDownload(
+    `/api/translation/v1/jobs/${job.id}/output`,
+    `${job.id}_mono${extensionOf(job.title)}`,
+  );
+}
+
 export const translationJobSource: JobSource = {
   slug: 'translation',
   listHistory: async () => (await translationApi.listJobs()).map(normalizeTranslationHistoryItem),
@@ -140,11 +165,7 @@ export const translationJobSource: JobSource = {
     return useMemo(
       () => ({
         cancel: (job: UnifiedJob) => ctx.cancelJob(job.id),
-        download: async (job: UnifiedJob) => {
-          const url = await ctx.getValidDownloadUrl(job.id);
-          if (!url) throw new Error('Download link is not available for this job.');
-          window.open(url, '_blank', 'noopener');
-        },
+        download: (job: UnifiedJob) => downloadTranslationOutput(job),
       }),
       [ctx],
     );

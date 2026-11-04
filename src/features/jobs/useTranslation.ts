@@ -2,7 +2,6 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { translationApi } from '../../api/client';
 import type {
   JobStatusResponse,
-  DownloadUrlResponse,
   MultiTranslateResponse,
   MultiJobStatusItem,
 } from '../../api/types';
@@ -61,7 +60,6 @@ export const useTranslation = () => {
   const [batchId, setBatchId] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Record<string, JobStatusResponse>>({});
   const [jobOrder, setJobOrder] = useState<string[]>([]);
-  const [downloadInfo, setDownloadInfo] = useState<Record<string, DownloadUrlResponse>>({});
   const [error, setError] = useState<string | null>(null);
   /**
    * Set when the backend reused an existing job instead of creating a new
@@ -104,8 +102,6 @@ export const useTranslation = () => {
   const sessionGenRef = useRef<number>(0);
   /** Mounted flag to prevent setState after unmount. */
   const isMountedRef = useRef<boolean>(true);
-  /** When each download URL was last fetched (ms since epoch). */
-  const downloadFetchedAtRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -152,20 +148,6 @@ export const useTranslation = () => {
   }, []);
 
   /**
-   * Fetch a fresh signed download URL for a specific job and cache it.
-   */
-  const fetchDownloadUrl = useCallback(async (jobId: string) => {
-    try {
-      const info = await translationApi.getDownloadUrl(jobId);
-      if (!isMountedRef.current) return;
-      setDownloadInfo((prev) => ({ ...prev, [jobId]: info }));
-      downloadFetchedAtRef.current[jobId] = Date.now();
-    } catch (err) {
-      console.warn(`Could not fetch signed download URL for ${jobId}:`, err);
-    }
-  }, []);
-
-  /**
    * Fetch full job details for completed jobs so we can display metadata
    * (model, cost, tokens, etc.) that the batch status endpoint omits.
    */
@@ -174,38 +156,10 @@ export const useTranslation = () => {
       const data = await translationApi.getJobStatus(jobId);
       if (!isMountedRef.current) return;
       setJobs((prev) => ({ ...prev, [jobId]: data }));
-      if (data.status === 'completed' && data.result?.translated_document?.download_url) {
-        await fetchDownloadUrl(jobId);
-      }
     } catch (err) {
       console.warn(`Could not fetch job details for ${jobId}:`, err);
     }
-  }, [fetchDownloadUrl]);
-
-  /**
-   * Returns a guaranteed-valid download URL for a job, re-fetching if expired.
-   */
-  const getValidDownloadUrl = useCallback(async (jobId: string): Promise<string | null> => {
-    const cached = downloadInfo[jobId];
-    if (cached) {
-      const ageMs = Date.now() - (downloadFetchedAtRef.current[jobId] ?? 0);
-      const expiresInMs = cached.expires_in * 1000;
-      if (ageMs < expiresInMs - 60_000) {
-        return cached.download_url;
-      }
-    }
-
-    try {
-      const info = await translationApi.getDownloadUrl(jobId);
-      if (isMountedRef.current) {
-        setDownloadInfo((prev) => ({ ...prev, [jobId]: info }));
-        downloadFetchedAtRef.current[jobId] = Date.now();
-      }
-      return info.download_url;
-    } catch {
-      return cached?.download_url ?? jobs[jobId]?.result?.translated_document?.download_url ?? null;
-    }
-  }, [downloadInfo, jobs]);
+  }, []);
 
   /**
    * Single active-jobs poll tick. Polls the union of all active (queued/processing)
@@ -435,11 +389,9 @@ export const useTranslation = () => {
     setBatchId(null);
     setJobs({});
     setJobOrder([]);
-    setDownloadInfo({});
     setError(null);
     setDuplicateNotice(null);
     setResumeFailedNotice(null);
-    downloadFetchedAtRef.current = {};
     clearPolling();
   }, [clearPolling]);
 
@@ -492,7 +444,6 @@ export const useTranslation = () => {
     batchId,
     jobs,
     jobOrder,
-    downloadInfo,
     error,
     duplicateNotice,
     dismissDuplicateNotice,
@@ -503,7 +454,6 @@ export const useTranslation = () => {
     resumeBatch,
     retryOrReset,
     reset,
-    getValidDownloadUrl,
     cancelJob,
   };
 };

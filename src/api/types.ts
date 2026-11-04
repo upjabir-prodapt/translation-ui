@@ -4,7 +4,6 @@ export interface TranslateRequest {
   target_languages: string[]; // 1–5 target language codes (e.g. ["de", "fr"])
   source_language?: string;   // Optional – auto-detected if omitted
   domain: string;             // "commercial" | "legal" | "finance" | "hr" | "operations"
-  enable_dlp?: boolean;
   enable_chunking?: boolean;
   priority?: string;          // "standard" | "high" (server-controlled; auto-promoted for .txt)
 }
@@ -54,8 +53,8 @@ export interface MultiJobStatusItem {
     | 'human_review_required'
     | 'failed'
     | 'cancelled';
-  download_url?: string | null;
-  download_filename?: string | null;
+  // `download_url` / `download_filename` are still sent but deliberately not
+  // typed: downloads always go through `GET /jobs/{id}/output` (jobSource.ts).
   error_message?: string | null;
 }
 
@@ -69,7 +68,6 @@ export interface TranslationResult {
     content: string | null;
     format: string;
     filename: string;
-    download_url: string;
   };
   metadata: {
     source_language: string;
@@ -125,21 +123,12 @@ export interface LegacyJobStatusResponse {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
-  download_url: string | null;
   error_message: string | null;
   // Confirmed fields returned by GET /jobs (JobStatusResponse), sourced from
   // the job's source_document / translation_config records.
   filename?: string | null;
   source_language?: string | null;
   target_language?: string | null;
-}
-
-// GET /api/v1/jobs/{job_id}/download → 200
-export interface DownloadUrlResponse {
-  download_url: string;
-  expires_in: number;
-  filename: string;
-  file_size: number;
 }
 
 // Standard error shape from the API

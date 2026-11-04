@@ -1,7 +1,7 @@
 #!/bin/sh
 # Renders nginx/default.conf.template into a concrete nginx config.
 #
-#   render-conf.sh <template> <output> <slug> [csp-connect-src-extra] [csp-object-store-origin]
+#   render-conf.sh <template> <output> <slug> [csp-connect-src-extra]
 #
 # Run by the Dockerfile's build stage, once, so the image ships a finished
 # config and nothing is substituted at container start.
@@ -13,14 +13,14 @@
 #
 #   csp-connect-src-extra    appended to connect-src, e.g. NaaS's map tile host
 #                            (the BFF's CSP_CONNECT_SRC_EXTRA).
-#   csp-object-store-origin  appended to connect-src, img-src and media-src,
-#                            e.g. https://storage.googleapis.com when the
-#                            browser PUTs to signed GCS URLs (the BFF's
-#                            object_store_origin).
+#
+# There is no object-store origin (the BFF's object_store_origin): this app's
+# browser code never reaches GCS directly, so storage.googleapis.com is not in
+# connect-src, img-src or media-src.
 set -eu
 
-if [ "$#" -lt 3 ] || [ "$#" -gt 5 ]; then
-  echo "usage: $0 <template> <output> <slug> [csp-connect-src-extra] [csp-object-store-origin]" >&2
+if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then
+  echo "usage: $0 <template> <output> <slug> [csp-connect-src-extra]" >&2
   exit 2
 fi
 
@@ -28,7 +28,6 @@ template="$1"
 output="$2"
 slug="$3"
 connect_src_extra="${4:-}"
-object_store_origin="${5:-}"
 
 # The slug becomes a URL path segment and nginx location names, so keep it to
 # the characters a slug can legitimately have.
@@ -41,7 +40,7 @@ esac
 
 # Origins land inside a double-quoted nginx string: refuse anything that could
 # end it or start a new directive.
-for value in "$connect_src_extra" "$object_store_origin"; do
+for value in "$connect_src_extra"; do
   case "$value" in
     *[!A-Za-z0-9:/._*\ -]*)
       echo "ERROR - CSP origin list '${value}' contains characters other than [A-Za-z0-9:/._* -]." >&2
@@ -52,7 +51,6 @@ done
 
 # Collapse whitespace, as the BFF's .strip() does for the ends.
 connect_src_extra="$(printf '%s' "$connect_src_extra" | tr -s ' ' | sed 's/^ //; s/ $//')"
-object_store_origin="$(printf '%s' "$object_store_origin" | tr -d ' ')"
 
 connect_src="'self'"
 if [ -n "$connect_src_extra" ]; then
@@ -60,11 +58,6 @@ if [ -n "$connect_src_extra" ]; then
 fi
 media_src="'self' blob:"
 img_src="'self' data: blob:"
-if [ -n "$object_store_origin" ]; then
-  connect_src="${connect_src} ${object_store_origin}"
-  media_src="${media_src} ${object_store_origin}"
-  img_src="${img_src} ${object_store_origin}"
-fi
 
 csp="default-src 'self'"
 csp="${csp}; script-src 'self'"

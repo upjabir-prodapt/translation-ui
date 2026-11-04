@@ -94,11 +94,11 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
   const [sourceLang, setSourceLang] = useState('en');
   const [targetLangs, setTargetLangs] = useState<string[]>(['de']);
   const [domain, setDomain] = useState('legal');
-  // enable_dlp, enable_chunking, and priority are no longer surfaced in the
-  // UI -- the backend (Translation service) already applies these exact
-  // defaults (enable_dlp=True, enable_chunking=True, priority="standard")
-  // when the fields are omitted from the request, so there is nothing to
-  // send here. See Translation/src/api/routes/v1/translate.py and
+  // enable_chunking and priority are not surfaced in the UI -- the backend
+  // (Translation service) applies its defaults (enable_chunking=True,
+  // priority="standard") when the fields are omitted. DLP is forced on
+  // server-side and any `enable_dlp` field is ignored, so it is never sent.
+  // See Translation/src/api/routes/v1/translate.py and
   // Translation/src/api/schemas/requests.py.
 
 

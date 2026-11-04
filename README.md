@@ -108,15 +108,17 @@ directive), `Strict-Transport-Security`, `X-Content-Type-Options`,
 gzip for JS, CSS, SVG and JSON; the process runs as uid 101
 (`nginxinc/nginx-unprivileged`, pinned) on port 8080.
 
-The CSP's two per-app inputs are Dockerfile `ARG`s, because they are a property
-of the code rather than of an environment:
+The CSP's one per-app input is a Dockerfile `ARG`, because it is a property of
+the code rather than of an environment:
 
 | ARG | This repo | Meaning (BFF equivalent) |
 |---|---|---|
 | `CSP_CONNECT_SRC_EXTRA` | (empty) | Extra `connect-src` origins, e.g. NaaS's map tiles (`CSP_CONNECT_SRC_EXTRA`) |
-| `CSP_OBJECT_STORE_ORIGIN` | https://storage.googleapis.com | Added to `connect-src`, `img-src`, `media-src` when the browser PUTs to signed GCS URLs (`object_store_origin`) |
 
-An empty value adds nothing.
+An empty value adds nothing. There is no object-store origin (the BFF's
+`object_store_origin`): the browser never talks to GCS — uploads are multipart
+through the BFF and downloads stream from `GET /jobs/{id}/output` — so
+`storage.googleapis.com` is in no directive.
 
 ## Local development
 

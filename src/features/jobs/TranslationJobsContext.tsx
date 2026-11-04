@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useTranslation as useTranslationJobsHook } from './useTranslation';
+import { useAuth } from '@aicoe/aihub-platform/auth';
 import { translationApi } from '../../api/client';
 import { TranslationJobsContext } from './translationJobsContextValue';
 
@@ -65,6 +66,7 @@ function clearStoredBatch(): void {
 
 export const TranslationJobsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const value = useTranslationJobsHook();
+  const { status: authStatus } = useAuth();
   const hasAttemptedResumeRef = useRef(false);
 
   // Persist the active batch whenever it changes.
@@ -86,10 +88,19 @@ export const TranslationJobsProvider: React.FC<{ children: React.ReactNode }> = 
     }
   }, [value.status, value.jobOrder, value.jobs]);
 
-  // On first mount, attempt to resume any previously in-progress batch by
-  // re-validating it live against the backend -- never trust localStorage
-  // alone for status or authorization.
+  // Once the session is established, attempt to resume any previously
+  // in-progress batch by re-validating it live against the backend -- never
+  // trust localStorage alone for status or authorization.
+  //
+  // Gated on `authStatus === 'authenticated'`, not on mount: PlatformProviders
+  // renders this provider while `GET /auth/session` is still in flight, and
+  // the platform client only attaches `X-CSRF-Token` once that probe has
+  // called setCsrfToken(). Firing on mount sent the resume
+  // `POST /jobs/status` with no CSRF header, which the BFF rejected with
+  // 403 "missing X-CSRF-Token header" -- and the catch below then dropped the
+  // saved batch and told the user it could not be found.
   useEffect(() => {
+    if (authStatus !== 'authenticated') return;
     if (hasAttemptedResumeRef.current) return;
     hasAttemptedResumeRef.current = true;
 
@@ -134,7 +145,7 @@ export const TranslationJobsProvider: React.FC<{ children: React.ReactNode }> = 
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authStatus]);
 
   return (
     <TranslationJobsContext.Provider value={value}>

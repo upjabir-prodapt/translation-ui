@@ -18,11 +18,12 @@ FROM node:24.20.0-alpine3.24 AS build
 # The URL path segment this app owns. Must match `APP_SLUG` in src/app/config.ts,
 # `SLUG` in vite.config.ts and the load balancer's path rule.
 ARG SLUG=translation
-# Extra CSP origins, exactly as aihub-bff's CSP_CONNECT_SRC_EXTRA /
-# object_store_origin. Part of the image, not the environment: they are a
-# property of the code (e.g. NaaS's map tiles), the same in every environment.
+# Extra connect-src origins, exactly as aihub-bff's CSP_CONNECT_SRC_EXTRA. Part
+# of the image, not the environment: a property of the code (e.g. NaaS's map
+# tiles), the same in every environment. No object-store origin: the browser
+# never talks to GCS (uploads are multipart through the BFF, downloads stream
+# from GET /jobs/{id}/output).
 ARG CSP_CONNECT_SRC_EXTRA=""
-ARG CSP_OBJECT_STORE_ORIGIN="https://storage.googleapis.com"
 
 WORKDIR /build
 
@@ -45,7 +46,7 @@ COPY . .
 RUN npm run build
 
 RUN sh nginx/render-conf.sh nginx/default.conf.template /build/default.conf \
-      "$SLUG" "$CSP_CONNECT_SRC_EXTRA" "$CSP_OBJECT_STORE_ORIGIN"
+      "$SLUG" "$CSP_CONNECT_SRC_EXTRA"
 
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
