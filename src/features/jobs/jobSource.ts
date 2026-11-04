@@ -11,7 +11,7 @@ import {
 import type { JobStatusResponse, LegacyJobStatusResponse } from '../../api/types';
 import { translationApi } from '../../api/client';
 import { openRunFeedback } from '@aicoe/aihub-platform/ui';
-import { apiDownload } from '@aicoe/aihub-platform/api';
+import { ApiError, apiDownload } from '@aicoe/aihub-platform/api';
 import { useTranslationJobs } from './useTranslationJobs';
 
 /**
@@ -44,6 +44,23 @@ export function extractTranslationDetail(job: JobStatusResponse): UnifiedJobDeta
   };
 }
 
+/**
+ * "Available until <date>" for a job's `expires_at` (submission + the
+ * backend's retention period), in the browser's locale; '' when absent so an
+ * older backend that does not send it changes nothing.
+ */
+export function availableUntilLabel(expiresAt: string | null | undefined): string {
+  if (!expiresAt) return '';
+  const date = new Date(expiresAt);
+  if (Number.isNaN(date.getTime())) return '';
+  const formatted = date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  return `Available until ${formatted}`;
+}
+
 const TRANSLATION_STATUS_MAP: Record<string, UnifiedJobStatus> = {
   queued: 'queued',
   pending: 'queued',
@@ -70,7 +87,7 @@ export function normalizeTranslationHistoryItem(item: LegacyJobStatusResponse): 
         ? `→ ${item.target_language}`
         : '';
 
-  const subtitle = ['Translation', languagePair, item.current_stage]
+  const subtitle = ['Translation', languagePair, item.current_stage, availableUntilLabel(item.expires_at)]
     .filter((part) => !!part && part.trim() !== '')
     .join(' · ');
 
@@ -104,7 +121,12 @@ export function normalizeTranslationActiveItem(item: JobStatusResponse): Unified
     service: 'translation',
     serviceLabel: 'Translation',
     title: filename || shortRunLabel(item.job_id),
-    subtitle: targetLang ? `Translation · → ${targetLang}` : 'Translation',
+    subtitle: [
+      targetLang ? `Translation · → ${targetLang}` : 'Translation',
+      availableUntilLabel(item.expires_at),
+    ]
+      .filter(Boolean)
+      .join(' · '),
     status,
     // No numeric progress is exposed for in-flight jobs by this endpoint —
     // render an indeterminate bar rather than fabricate a percentage.
@@ -129,6 +151,13 @@ function extensionOf(name: string): string {
 }
 
 /**
+ * Shown when `/output` answers 410 without a readable message: the job is past
+ * its retention period, or its file was already deleted.
+ */
+export const RETENTION_EXPIRED_MESSAGE =
+  "This job's files were deleted after the 6-month retention period.";
+
+/**
  * Downloads a finished job's translated file through the BFF:
  * `GET /api/translation/v1/jobs/{id}/output` streams it with
  * `Content-Disposition: attachment`, and `apiDownload` saves it from a blob
@@ -139,11 +168,25 @@ function extensionOf(name: string): string {
  * if the response carries no filename. The jobs' own `download_url` fields are
  * deliberately not read.
  */
-export function downloadTranslationOutput(job: Pick<UnifiedJob, 'id' | 'title'>): Promise<void> {
-  return apiDownload(
-    `/api/translation/v1/jobs/${job.id}/output`,
-    `${job.id}_mono${extensionOf(job.title)}`,
-  );
+export async function downloadTranslationOutput(
+  job: Pick<UnifiedJob, 'id' | 'title'>,
+): Promise<void> {
+  try {
+    await apiDownload(
+      `/api/translation/v1/jobs/${job.id}/output`,
+      `${job.id}_mono${extensionOf(job.title)}`,
+    );
+  } catch (err) {
+    // 410: the files are gone after the retention period. Surface the
+    // server's own sentence rather than a generic "Request failed (HTTP 410)".
+    if (err instanceof ApiError && err.status === 410) {
+      const detail = (err.body as { detail?: unknown } | null)?.detail;
+      throw new Error(
+        typeof detail === 'string' && detail.trim() ? detail : RETENTION_EXPIRED_MESSAGE,
+      );
+    }
+    throw err;
+  }
 }
 
 export const translationJobSource: JobSource = {
@@ -173,5 +216,7 @@ export const translationJobSource: JobSource = {
   // Feedback on a finished run goes to the AI Hub's ticket form.
   openFeedback: openRunFeedback,
   label: 'Translation',
+  // Backend keeps runs and outputs for JOB_RETENTION_DAYS (183); shown in the Job Tracker.
+  historyWindow: '6 months',
   fetchDetail: async (job) => extractTranslationDetail(await translationApi.getJobStatus(job.id)),
 };

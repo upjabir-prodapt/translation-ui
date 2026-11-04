@@ -79,7 +79,7 @@ describe('App', () => {
     render(<App />);
 
     expect(
-      await screen.findByText(/No runs in the last 7 days/, {}, LAZY_ROUTE),
+      await screen.findByText(/No runs in the last 6 months/, {}, LAZY_ROUTE),
     ).toBeInTheDocument();
     expect(window.location.pathname).toBe('/translation/tracker');
   }, TEST_TIMEOUT);

@@ -56,6 +56,8 @@ export interface MultiJobStatusItem {
   // `download_url` / `download_filename` are still sent but deliberately not
   // typed: downloads always go through `GET /jobs/{id}/output` (jobSource.ts).
   error_message?: string | null;
+  /** When the job and its files are deleted (submission + retention period). */
+  expires_at?: string | null;
 }
 
 export interface MultiJobStatusResponse {
@@ -106,6 +108,8 @@ export interface JobStatusResponse {
     | 'cancelled';
   submitted_at: string;
   completed_at?: string | null;
+  /** When the job and its files are deleted (submission + retention period). */
+  expires_at?: string | null;
   result?: TranslationResult | null;
   error_message?: string | null;
 }
@@ -129,6 +133,18 @@ export interface LegacyJobStatusResponse {
   filename?: string | null;
   source_language?: string | null;
   target_language?: string | null;
+  /** When the job and its files are deleted (submission + retention period). */
+  expires_at?: string | null;
+}
+
+// GET /api/translation/v1/jobs → 200
+export interface JobListResponse {
+  jobs: LegacyJobStatusResponse[];
+  total?: number;
+  limit?: number;
+  offset?: number;
+  /** Pass back as `cursor` for the next (older) page; absent/null on the last. */
+  next_cursor?: string | null;
 }
 
 // Standard error shape from the API
