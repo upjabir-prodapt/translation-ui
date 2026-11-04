@@ -3,7 +3,6 @@ import type {
   MultiJobStatusRequest,
   MultiJobStatusResponse,
   JobStatusResponse,
-  DownloadUrlResponse,
   LegacyJobStatusResponse,
 } from './types';
 import { apiFetch, apiJson, apiPostJson } from '@aicoe/aihub-platform/api';
@@ -18,15 +17,6 @@ import { apiFetch, apiJson, apiPostJson } from '@aicoe/aihub-platform/api';
  * the architecture that needed them.
  */
 const API_BASE = '/api/translation/v1';
-
-/** `POST /api/translation/uploads` — signed GCS PUT URL (decision D10). */
-export interface SignedUpload {
-  upload_url: string;
-  gs_uri: string;
-  object_name: string;
-  expires_in: number;
-  required_headers: Record<string, string>;
-}
 
 export const translationApi = {
   async startTranslation(formData: FormData): Promise<MultiTranslateResponse> {
@@ -48,12 +38,6 @@ export const translationApi = {
   async getJobStatus(jobId: string): Promise<JobStatusResponse> {
     return await apiJson<JobStatusResponse>(`${API_BASE}/translate/${jobId}`, {
       errorMessage: 'Failed to fetch job status',
-    });
-  },
-
-  async getDownloadUrl(jobId: string): Promise<DownloadUrlResponse> {
-    return await apiJson<DownloadUrlResponse>(`${API_BASE}/jobs/${jobId}/download`, {
-      errorMessage: 'Failed to get download URL',
     });
   },
 
@@ -82,41 +66,6 @@ export const translationApi = {
       { reason: reason ?? 'Cancelled by user' },
       { method: 'DELETE', errorMessage: 'Failed to cancel job' },
     );
-  },
-
-  /**
-   * Ask the BFF for a signed GCS PUT URL so the document never crosses Apigee.
-   * Returns `null` when `TRANSLATION_UPLOAD_MODE=multipart`, in which case the
-   * caller falls back to posting the file through the proxy.
-   */
-  async requestSignedUpload(file: File): Promise<SignedUpload | null> {
-    try {
-      return await apiPostJson<SignedUpload>('/api/translation/uploads', {
-        filename: file.name,
-        content_type: file.type || 'application/octet-stream',
-        size_bytes: file.size,
-      });
-    } catch (err) {
-      // 409 means the deployment is in multipart mode; anything else is real.
-      if (err && typeof err === 'object' && (err as { status?: number }).status === 409) {
-        return null;
-      }
-      throw err;
-    }
-  },
-
-  /** PUT the file straight to GCS. Must send exactly the signed headers. */
-  async uploadToSignedUrl(signed: SignedUpload, file: File): Promise<void> {
-    const response = await fetch(signed.upload_url, {
-      method: 'PUT',
-      headers: signed.required_headers,
-      body: file,
-      // Cross-origin to storage.googleapis.com; never send our cookie.
-      credentials: 'omit',
-    });
-    if (!response.ok) {
-      throw new Error(`Upload to storage failed (HTTP ${response.status})`);
-    }
   },
 
   /** Escape hatch for callers that need the raw `Response`. */
