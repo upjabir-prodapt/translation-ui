@@ -65,6 +65,14 @@ COPY --from=build --chown=root:root /build/dist /usr/share/nginx/html/${SLUG}
 
 ENV NGINX_ENTRYPOINT_QUIET_LOGS=1
 
+# Security updates for the Alpine packages in the pinned base (curl, expat,
+# zlib, brotli ...): the CI scan gate blocks fixable CRITICAL/HIGH findings.
+# Root for this one step only; the proxy is the build-time predefined ARG and
+# is not persisted.
+USER root
+RUN export http_proxy="${HTTP_PROXY:-}" https_proxy="${HTTPS_PROXY:-${HTTP_PROXY:-}}"; \
+    apk upgrade --no-cache
+
 USER 101
 
 EXPOSE 8080

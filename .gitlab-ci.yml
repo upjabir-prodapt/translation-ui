@@ -451,7 +451,7 @@ build-and-push:
       # environment-specific values are baked in, so one image is promotable
       # across sandbox -> dev -> prod.
       # shellcheck disable=SC2086
-      docker build $PROXY_ARGS \
+      docker build --pull $PROXY_ARGS \
         --build-arg SLUG="$SLUG" \
         --secret id=npmrc,src="$AIHUB_NPMRC" \
         --label "org.opencontainers.image.revision=${CI_COMMIT_SHA}" \
@@ -475,15 +475,31 @@ build-and-push:
     - if: $CI_COMMIT_BRANCH == "dev"
     - if: $CI_COMMIT_BRANCH == "prod"
 
-# Binary Authorization: gclt-aicoe-dev-st carries a REQUIRE_ATTESTATION policy,
-# but on Cloud Run it is consulted only for a service deployed with
-# --binary-authorization=default. Neither shared-translation nor
-# shared-salesagent (nor shared-aihub-ui) attests an image or passes that flag
-# (AICOE-Terraform docs/24 §2.4a), and this pipeline deploys exactly as they
-# do. Turning the control on is platform-wide and ordered: an attestation step
-# signing the pushed digest with the aicoe-build-attestor's KMS key in EVERY
-# app pipeline first, then the flag on every deploy. The flag alone blocks
-# every deploy.
+# Scan gate + Binary Authorization (AI CoE security hardening S-3).
+# Waits for Artifact Analysis to scan the pushed digest, fails on any fixable
+# CRITICAL/HIGH finding not accepted in ci/vuln-exceptions.txt, then signs an
+# attestation with the aicoe-build-attestor KMS key. deploy-cloud-run deploys
+# that exact digest with --binary-authorization=default, so Cloud Run admits
+# only images that came through this gate.
+scan-and-attest:
+  stage: build
+  extends:
+    - ".gcp_wif"
+    - ".shell_runner"
+  needs:
+    - build-and-push
+  script:
+    - |
+      IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
+      bash ci/scan_and_attest.sh "IMAGE=${IMAGE_URI}"
+  artifacts:
+    reports:
+      dotenv: attested.env
+  rules:
+    - if: $CI_COMMIT_BRANCH == "sandbox"
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "prod"
+
 deploy-cloud-run:
   stage: deploy
   extends:
@@ -491,6 +507,8 @@ deploy-cloud-run:
     - ".shell_runner"
   needs:
     - build-and-push
+    - job: scan-and-attest
+      artifacts: true
   environment:
     name: "$CI_COMMIT_BRANCH"
   when: manual
@@ -515,10 +533,12 @@ deploy-cloud-run:
       # needs the Secure Web Proxy, and nothing reaches the internet.
       #
       # No --set-env-vars: the image carries no runtime configuration.
+      : "${IMAGE_DIGEST:?scan-and-attest did not provide IMAGE_DIGEST}"
       gcloud beta run deploy "$CLOUD_RUN_SERVICE" \
         --quiet \
         --update-labels="app=${SLUG}-ui,env=${CI_COMMIT_BRANCH},managed-by=gitlab-ci,git-sha=${CI_COMMIT_SHORT_SHA},pipeline=${CI_PIPELINE_IID}" \
-        --image "$IMAGE_URI" \
+        --image "$IMAGE_DIGEST" \
+        --binary-authorization=default \
         --platform=managed \
         --region="$GCP_REGION" \
         --project="$GCP_PROJECT_ID" \

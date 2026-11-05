@@ -1,0 +1,9 @@
+# Accepted vulnerabilities for the CI scan gate (ci/scan_and_attest.sh).
+#
+# The gate blocks any CRITICAL or HIGH finding that has a fix available.
+# Fix it (upgrade the package or base image) wherever possible. Only when a
+# fix cannot ship yet, add ONE line per CVE, with an expiry date no more than
+# 30 days out and the reason; an expired line blocks again:
+#
+#   CVE-2026-12345  2026-12-05  no fixed release of libfoo for bookworm yet; tracked in <ticket>
+#
