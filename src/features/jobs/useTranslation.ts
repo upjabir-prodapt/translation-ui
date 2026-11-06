@@ -26,6 +26,14 @@ const TERMINAL_STATUSES = ['completed', 'human_review_required', 'failed', 'canc
 
 const isTerminal = (status: string): boolean => TERMINAL_STATUSES.includes(status);
 
+/**
+ * How often active jobs are polled. Translation jobs take about 1.5 minutes
+ * (median) and up to about 7 minutes (p95) in dev, so 10 s is still responsive
+ * while cutting status calls by 70% compared with the former 3 s (each call
+ * is a BigQuery query through the BFF, Apigee and the API).
+ */
+const POLL_INTERVAL_MS = 10_000;
+
 // ── Retry helper ───────────────────────────────────────────────────────────
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -256,7 +264,7 @@ export const useTranslation = () => {
     if (pollingIntervalRef.current === null) {
       pollingIntervalRef.current = window.setInterval(() => {
         void pollActiveJobs(myGen);
-      }, 3000);
+      }, POLL_INTERVAL_MS);
     }
 
     void pollActiveJobs(myGen);
