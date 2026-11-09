@@ -451,7 +451,11 @@ build-and-push:
       # environment-specific values are baked in, so one image is promotable
       # across sandbox -> dev -> prod.
       # shellcheck disable=SC2086
-      docker build --pull $PROXY_ARGS \
+      # --no-cache: the OS security-update layer must re-run on every build. With
+      # only --pull, an unchanged base digest reuses the cached layer on the shared
+      # runner and Debian/Alpine fixes published since then never reach the image
+      # (2026-11-09: zlib CVE-2026-76844/85091 blocked although +deb13u1 was out).
+      docker build --pull --no-cache $PROXY_ARGS \
         --build-arg SLUG="$SLUG" \
         --secret id=npmrc,src="$AIHUB_NPMRC" \
         --label "org.opencontainers.image.revision=${CI_COMMIT_SHA}" \
