@@ -17,7 +17,7 @@ import '../styles/translation.css';
 const LANGUAGES = [
   { code: 'en', label: 'English', flag: 'EN' },
   { code: 'de', label: 'German', flag: '🇩🇪' },
-  { code: 'de-CH', label: 'Swiss German', flag: '🇨🇭' },
+  { code: 'de-CH', label: 'German (Switzerland)', flag: '🇨🇭' },
   { code: 'nl', label: 'Dutch', flag: '🇳🇱' },
   { code: 'it', label: 'Italian', flag: '🇮🇹' },
   { code: 'fr', label: 'French', flag: '🇫🇷' },
@@ -27,6 +27,16 @@ const LANGUAGES = [
 ];
 
 const SOURCE_LANGUAGES = LANGUAGES;
+
+/** Base language of a code, without its region: 'de-CH' -> 'de'. */
+const baseLanguage = (code: string) => code.toLowerCase().split(/[-_]/)[0];
+
+/**
+ * True when two codes are the same language, regional variants included.
+ * German into German (Switzerland) is a localisation, not a translation;
+ * the API rejects such pairs, so the picker never offers them.
+ */
+const sameLanguage = (a: string, b: string) => baseLanguage(a) === baseLanguage(b);
 
 /** Filename given to pasted text when it's wrapped into an uploadable .txt file. */
 const TEXT_INPUT_FILENAME = 'pasted-text.txt';
@@ -207,16 +217,17 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
 
   // ── Target language multi-select ──
   const toggleTarget = (code: string) => {
-    if (code === sourceLang) return; // can't translate a language into itself
+    if (sameLanguage(code, sourceLang)) return; // can't translate a language into itself
     setTargetLangs((prev) =>
       prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
     );
   };
 
-  // When the source changes, drop it from the target selection if present.
+  // When the source changes, drop it (and its regional variants) from the
+  // target selection if present.
   const handleSourceChange = (code: string) => {
     setSourceLang(code);
-    setTargetLangs((prev) => prev.filter((c) => c !== code));
+    setTargetLangs((prev) => prev.filter((c) => !sameLanguage(c, code)));
   };
 
   // ── Translate ──
@@ -233,8 +244,8 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
       return;
     }
 
-    if (targetLangs.includes(sourceLang)) {
-      alert('Source and target languages must be different.');
+    if (targetLangs.some((c) => sameLanguage(c, sourceLang))) {
+      alert('Source and target languages must be different languages.');
       return;
     }
 
@@ -289,7 +300,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
     !textTooLong &&
     targetLangs.length > 0 &&
     targetLangs.length <= 5 &&
-    !targetLangs.includes(sourceLang) &&
+    !targetLangs.some((c) => sameLanguage(c, sourceLang)) &&
     !isSubmitting;
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -470,7 +481,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
                 </button>
                 {targetDropdownOpen && (
                   <ul className="multiselect-menu" role="listbox" aria-label="Target languages">
-                    {LANGUAGES.filter((l) => l.code !== sourceLang).map((l) => {
+                    {LANGUAGES.filter((l) => !sameLanguage(l.code, sourceLang)).map((l) => {
                       const isSelected = targetLangs.includes(l.code);
                       return (
                         <li
