@@ -179,13 +179,19 @@ variables:
       : "${GCP_PROJECT_ID:?Set GCP_PROJECT_ID (scope: ${CI_COMMIT_BRANCH})}"
       echo "$WORKLOAD_IDENTITY_TOKEN" > workload_identity.jwt
     - |
+      # docs/50 TF-2: the scan-and-attest job (WIF_IDENTITY=attestor) signs as
+      # ATTESTOR_SERVICE_ACCOUNT; every other job, and that job while the
+      # variable is unset, impersonates SERVICE_ACCOUNT.
+      WIF_SA="${SERVICE_ACCOUNT}"
+      if [ "${WIF_IDENTITY:-}" = "attestor" ]; then WIF_SA="${ATTESTOR_SERVICE_ACCOUNT:-${SERVICE_ACCOUNT}}"; fi
+      echo "WIF: impersonating ${WIF_SA}"
       printf '%s\n' "{
         \"type\": \"external_account\",
         \"audience\": \"//iam.googleapis.com/projects/${WORKLOAD_IDENTITY_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WORKLOAD_IDENTITY_POOL}/providers/${WORKLOAD_IDENTITY_PROVIDER}\",
         \"subject_token_type\": \"urn:ietf:params:oauth:token-type:jwt\",
         \"token_url\": \"https://sts.googleapis.com/v1/token\",
         \"credential_source\": { \"file\": \"workload_identity.jwt\" },
-        \"service_account_impersonation_url\": \"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${SERVICE_ACCOUNT}:generateAccessToken\"
+        \"service_account_impersonation_url\": \"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${WIF_SA}:generateAccessToken\"
       }" > credentials.json
     - gcloud auth login --cred-file=credentials.json --quiet
     - gcloud config set project "$GCP_PROJECT_ID"
@@ -492,6 +498,11 @@ scan-and-attest:
     - ".shell_runner"
   needs:
     - build-and-push
+  # docs/50 TF-2: sign as attestor-signer, not as the deploy identity.
+  # .gcp_wif impersonates ATTESTOR_SERVICE_ACCOUNT here (SERVICE_ACCOUNT
+  # while it is unset); build and deploy jobs keep SERVICE_ACCOUNT.
+  variables:
+    WIF_IDENTITY: attestor
   script:
     - |
       IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
